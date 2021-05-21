@@ -179,13 +179,14 @@ def main():
                     font = cv2.FONT_HERSHEY_SIMPLEX
                     im = cv2.putText(frame, code, tuple((corners[0,:]+np.array([0,-15])).astype(np.int)), font, 1,(0,0,0), 2, cv2.LINE_AA)
 
-        if args.save_video is not None:
-            out.write(frame)
-        else:
-            cv2.imshow('frame',frame)
-            if args.visualize_detector:
-                cv2.imshow('detector_mask', mask_vis)
-            cv2.waitKey(1)
+                    if args.save_video is not None:
+                        for _ in range(30 * 2):
+                            out.write(frame)
+                    else:
+                        cv2.imshow('frame',frame)
+                        if args.visualize_detector:
+                            cv2.imshow('detector_mask', mask_vis)
+                        cv2.waitKey(1)
 
     cap.release()
     if args.save_video:
