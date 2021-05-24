@@ -7,15 +7,6 @@ import tensorflow.contrib.image
 from tensorflow.python.saved_model import tag_constants
 from tensorflow.python.saved_model import signature_constants
 
-parser = argparse.ArgumentParser()
-parser.add_argument('--detector_model', type=str, required=True)
-parser.add_argument('--decoder_model', type=str, required=True)
-parser.add_argument('--video', type=str, required=True)
-parser.add_argument('--secret_size', type=int, default=100)
-parser.add_argument('--save_video', type=str, default=None)
-parser.add_argument('--visualize_detector', action='store_true', help='Visualize detector mask output')
-args = parser.parse_args()
-
 BCH_POLYNOMIAL = 137
 BCH_BITS = 5
 
@@ -44,7 +35,17 @@ def order_points(pts):
     rect[3] = pts[np.argmax(diff)]
     return rect
 
-def main():
+def main(args=None, plt=None):
+    if 'args' == None:
+        print('parse args')
+        parser = argparse.ArgumentParser()
+        parser.add_argument('--detector_model', type=str, required=True)
+        parser.add_argument('--decoder_model', type=str, required=True)
+        parser.add_argument('--video', type=str, required=True)
+        parser.add_argument('--secret_size', type=int, default=100)
+        parser.add_argument('--save_video', type=str, default=None)
+        parser.add_argument('--visualize_detector', action='store_true', help='Visualize detector mask output')
+        args = parser.parse_args()
     # Initializing network
     config = tf.ConfigProto()
     config.gpu_options.allow_growth = True
@@ -113,6 +114,7 @@ def main():
             if len(hull) < 4:
                 continue
 
+#             print('Successful detect a image')
             if args.visualize_detector:
                 cv2.polylines(mask_vis, np.int32([corners]), thickness=6, color=(100,100,250), isClosed=True)
 
@@ -169,7 +171,8 @@ def main():
                 bitflips = bch.decode_inplace(data, ecc)
 
                 if bitflips != -1:
-                    print('Num bits corrected: ', bitflips)
+#                     print('Num bits corrected: ', bitflips)
+                    print('Successful decode a secret')
                     try:
                         code = data.decode("utf-8")
                     except:
@@ -183,10 +186,18 @@ def main():
                         for _ in range(30 * 2):
                             out.write(frame)
                     else:
-                        cv2.imshow('frame',frame)
-                        if args.visualize_detector:
-                            cv2.imshow('detector_mask', mask_vis)
-                        cv2.waitKey(1)
+                        if plt:
+                            plt.figure(figsize=(12,8), dpi=100, facecolor='w', edgecolor='k')
+                            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                            plt.imshow(frame)
+                            if args.visualize_detector:
+                                plt.imshow(mask_vis)
+                            plt.show()
+                        else:
+                            cv2.imshow('frame',frame)
+                            if args.visualize_detector:
+                                cv2.imshow('detector_mask', mask_vis)
+                            cv2.waitKey(1)
 
     cap.release()
     if args.save_video:
