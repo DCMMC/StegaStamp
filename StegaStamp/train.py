@@ -183,6 +183,7 @@ def main():
                 _, _, global_step = sess.run([train_secret_op,loss_op,global_step_tensor],feed_dict)
             else:
                 _, _, global_step = sess.run([train_op,loss_op,global_step_tensor],feed_dict)
+                # (DCMMC) according to base.sh, args.no_gan is false
                 if not args.no_gan:
                     sess.run([train_dis_op, clip_D],feed_dict)
 

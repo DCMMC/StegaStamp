@@ -97,6 +97,10 @@ parser.add_argument('--no_cover', type=bool, default=False, help='debug mode do 
 parser.add_argument('--plain_cover', type=bool, default=False, help='use plain cover')
 parser.add_argument('--noise_cover', type=bool, default=False, help='use noise cover')
 parser.add_argument('--cover_dependent', type=bool, default=False, help='Whether the secret image is dependent on the cover image')
+# (DCMMC) add two args
+parser.add_argument('--without_std_noise', action='store_true', help='without std noise')
+parser.add_argument('--without_warp_noise', action='store_true', help='without warp noise')
+parser.add_argument('--secret', type=str, default='test', help='secret')
 
 # custom weights initialization called on netG and netD
 def weights_init(m):
@@ -152,7 +156,7 @@ def main():
         DATA_DIR = '/media/user/SSD1TB-2/ImageNet' 
     elif opt.hostname == 'amax':
         # (DCMMC) server 199
-        DATA_DIR = '/data/xwt/Universal-Deep-Hiding/ImageNet'
+        DATA_DIR = '/data/xwt/Watermark/Universal-Deep-Hiding/ImageNet'
     assert DATA_DIR
 
 
@@ -374,7 +378,8 @@ def save_checkpoint(state, is_best, epoch, prefix):
             writer = csv.writer(csvfile, delimiter='\t')
             #writer.writerow([epoch, loss, train1, train5, prec1, prec5])
 
-def forward_pass(secret_img, secret_target, cover_img, cover_target, Hnet, Rnet, criterion, val_cover=0, i_c=None, position=None, Se_two=None):
+def forward_pass(secret_img, secret_target, cover_img, cover_target, Hnet, Rnet, criterion, val_cover=0,
+                 i_c=None, position=None, Se_two=None, with_std_noise=True, with_warp_noise=True):
 
     batch_size_secret, channel_secret, _, _ = secret_img.size()
     batch_size_cover, channel_cover, _, _ = cover_img.size()
@@ -439,18 +444,20 @@ def forward_pass(secret_img, secret_target, cover_img, cover_target, Hnet, Rnet,
         container_img = itm_secret_img + cover_imgv
     errH = criterion(container_img, cover_imgv)  # Hiding net
 
-    std_noise = (torch.rand(1)*0.05).item()
-    noise = torch.randn_like(container_img)*std_noise
-    container_img = container_img + noise
+    if with_std_noise:
+        std_noise = (torch.rand(1)*0.05).item()
+        noise = torch.randn_like(container_img)*std_noise
+        container_img = container_img + noise
 
-    # Get random homography matrix
-    homography = get_rand_homography_mat(opt.imageSize, opt.imageSize*0.1, opt.bs_secret)
-    homography = torch.from_numpy(homography).float().cuda()
+    if with_warp_noise:
+        # Get random homography matrix
+        homography = get_rand_homography_mat(opt.imageSize, opt.imageSize*0.1, opt.bs_secret)
+        homography = torch.from_numpy(homography).float().cuda()
 
-    # Apply the homography and then undo it
-    # (DCMMC) here is the key to train model for Universal photographic steganography
-    container_img = tgm.warp_perspective(container_img, homography[:, 1], (opt.imageSize, opt.imageSize))
-    container_img = tgm.warp_perspective(container_img, homography[:, 0], (opt.imageSize, opt.imageSize))
+        # Apply the homography and then undo it
+        # (DCMMC) here is the key to train model for Universal photographic steganography
+        container_img = tgm.warp_perspective(container_img, homography[:, 1], (opt.imageSize, opt.imageSize))
+        container_img = tgm.warp_perspective(container_img, homography[:, 0], (opt.imageSize, opt.imageSize))
 
     rev_secret_img = Rnet(container_img) 
     #secret_imgv = Variable(secret_img)  
@@ -583,7 +590,7 @@ def validation(val_loader, epoch, Hnet, Rnet, criterion):
 def analysis(val_loader, epoch, Hnet, Rnet, criterion):
     # (DCMMC) qr code as secret
     qr = qrcode.QRCode()
-    qr.add_data('test')
+    qr.add_data(opt.secret)
     qr.make(fit=True)
     img = qr.make_image(fill_color="black", back_color="white")
     img = np.array(img.convert('RGB'))
@@ -604,7 +611,9 @@ def analysis(val_loader, epoch, Hnet, Rnet, criterion):
         secret_img = np.transpose(secret_img, (0, 3, 1, 2)) / 255.0
 
         cover_imgv, container_img, secret_imgv_nh, rev_secret_img, errH, errR, diffH, diffR \
-        = forward_pass(secret_img, secret_target, cover_img, cover_target, Hnet, Rnet, criterion, val_cover=0)
+        = forward_pass(secret_img, secret_target, cover_img, cover_target, Hnet, Rnet,
+                       criterion, val_cover=0, with_std_noise=not opt.without_std_noise,
+                       with_warp_noise=not opt.without_warp_noise)
         secret_encoded = container_img - cover_imgv
 
         print("Secret APD C:", diffH.item())
@@ -612,7 +621,7 @@ def analysis(val_loader, epoch, Hnet, Rnet, criterion):
 
         save_result_pic(opt.bs_secret*opt.num_training, cover_imgv, container_img.data, secret_imgv_nh, rev_secret_img.data, epoch, i, opt.validationpics)
 
-        if i >= 4:
+        if i >= 3:
             break
 
 def print_log(log_info, log_path, console=True):
