@@ -442,6 +442,7 @@ def forward_pass(secret_img, secret_target, cover_img, cover_target, Hnet, Rnet,
     else:
         itm_secret_img = itm_secret_img.repeat(opt.num_training,1,1,1)
         container_img = itm_secret_img + cover_imgv
+        print('L1 metric of residual={:.4f}'.format(itm_secret_img.abs().mean()))
     errH = criterion(container_img, cover_imgv)  # Hiding net
 
     if with_std_noise:

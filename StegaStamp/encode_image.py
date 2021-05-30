@@ -77,6 +77,7 @@ def main():
             rescaled = (hidden_img[0] * 255).astype(np.uint8)
             raw_img = (image * 255).astype(np.uint8)
             residual = residual[0]+.5
+            print('L1 metric of residual={:.4f}'.format(np.mean(np.absolute(residual))))
 
             residual = (residual * 255).astype(np.uint8)
 
